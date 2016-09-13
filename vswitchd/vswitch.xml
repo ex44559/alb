@@ -1282,7 +1282,6 @@
           the active slave is disabled.  This is the only bonding mode in which
           interfaces may be plugged into different upstream switches.
         </dd>
-      </dl>
       
       <dt><code>adaptive-load-balance</code></dt>
         <dd>
