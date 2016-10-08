@@ -1266,6 +1266,7 @@ bond_rebalance(struct bond *bond)
     }
 
 	if (bond_is_ALB(bond) || time_msec() < bond->next_rebalance){
+		VLOG_INFO("prepare tp enter ALB balance function");
 		ALB_rebalance(bond);
 		goto done;
 	}
