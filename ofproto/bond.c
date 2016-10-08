@@ -1240,6 +1240,7 @@ ALB_rebalance(struct bond *bond)
     if (use_recirc && rebalanced) {
         bond_update_post_recirc_rules__(bond,true);
     }
+	VLOG_INFO("enter ALB balance function");
 
 	return;
 }
