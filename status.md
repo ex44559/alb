@@ -10,3 +10,6 @@ features:
 - 在vswitchd/vswitch.xml文件中添加新算法的描述；
 - 更新vswitchd/vswitch.ovsschema,并更新其校验和；
 - 更新系统目录下的conf.db文件，更新Open vSwitch的database。
+
+baseline:
+Open vSwitch 2.5.1
