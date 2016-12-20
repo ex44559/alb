@@ -1240,6 +1240,7 @@ ALB_rebalance(struct bond *bond)
     if (use_recirc && rebalanced) {
         bond_update_post_recirc_rules__(bond,true);
     }
+	VLOG_INFO("enter ALB balance function");
 
 	return;
 }
@@ -1265,6 +1266,7 @@ bond_rebalance(struct bond *bond)
     }
 
 	if (bond_is_ALB(bond) || time_msec() < bond->next_rebalance){
+		VLOG_INFO("prepare tp enter ALB balance function");
 		ALB_rebalance(bond);
 		goto done;
 	}
@@ -1912,6 +1914,8 @@ get_enabled_slave(struct bond *bond)
     return CONTAINER_OF(node, struct bond_slave, list_node);
 }
 
+//TODO:fix this function to support ALB output.
+
 static struct bond_slave *
 choose_output_slave(const struct bond *bond, const struct flow *flow,
                     struct flow_wildcards *wc, uint16_t vlan)
@@ -1934,6 +1938,8 @@ choose_output_slave(const struct bond *bond, const struct flow *flow,
     case BM_AB:
         return bond->active_slave;
 
+	case BM_ALB:
+		
     case BM_TCP:
         if (bond->lacp_status != LACP_NEGOTIATED) {
             /* Must have LACP negotiations for TCP balanced bonds. */
