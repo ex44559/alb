@@ -1943,6 +1943,10 @@ choose_output_slave(const struct bond *bond, const struct flow *flow,
             flow_mask_hash_fields(flow, wc, NX_HASH_FIELDS_SYMMETRIC_L4);
         }
         /* Fall Through. */
+
+	case BM_ALB:
+
+		
     case BM_SLB:
         if (wc) {
             flow_mask_hash_fields(flow, wc, NX_HASH_FIELDS_ETH_SRC);
@@ -1952,6 +1956,9 @@ choose_output_slave(const struct bond *bond, const struct flow *flow,
             e->slave = get_enabled_slave(CONST_CAST(struct bond*, bond));
         }
         return e->slave;
+
+	/*TODO: complete this.*/
+	
 
     default:
         OVS_NOT_REACHED();
