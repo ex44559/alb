@@ -1923,6 +1923,7 @@ choose_output_slave(const struct bond *bond, const struct flow *flow,
     struct bond_entry *e;
     int balance;
 
+	VLOG_INFO("enter choose_output_slave function");
     balance = bond->balance;
     if (bond->lacp_status == LACP_CONFIGURED) {
         /* LACP has been configured on this bond but negotiations were
