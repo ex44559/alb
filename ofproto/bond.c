@@ -1939,8 +1939,6 @@ choose_output_slave(const struct bond *bond, const struct flow *flow,
     case BM_AB:
         return bond->active_slave;
 
-	case BM_ALB:
-		
     case BM_TCP:
         if (bond->lacp_status != LACP_NEGOTIATED) {
             /* Must have LACP negotiations for TCP balanced bonds. */
