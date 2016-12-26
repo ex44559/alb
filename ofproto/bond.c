@@ -1869,7 +1869,7 @@ bond_hash_tcp(const struct flow *flow, uint16_t vlan, uint32_t basis)
 static unsigned int
 bond_hash(const struct bond *bond, const struct flow *flow, uint16_t vlan)
 {
-    ovs_assert(bond->balance == BM_TCP || bond->balance == BM_SLB);
+    //ovs_assert(bond->balance == BM_TCP || bond->balance == BM_SLB);
 
     return (bond->balance == BM_TCP
             ? bond_hash_tcp(flow, vlan, bond->basis)
