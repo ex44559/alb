@@ -19,8 +19,15 @@ struct nic_load {
 	unsigned int rx_bytes;
 };
 
+struct alb_nic_info {
+	unsigned int netdevSpeed;
+	unsigned int delay;
+	unsigned int jam; /* describe jam condition of a link */
+};
+
 int send_ioctl(struct cmd_context *ctx, void *cmd);
 struct ethtool_gstrings *get_stringset(struct cmd_context *ctx, enum ethtool_stringset set_id, 
 		ptrdiff_t drvinfo_offset, int null_terminate);
 
 int nic_investigation(char *dev_name, struct nic_load *nic);
+int ALB_nic_investigation(char *dev_name, struct alb_nic_info *nic);

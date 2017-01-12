@@ -149,6 +149,66 @@ int nic_investigation(char *dev_name, struct nic_load *nic)
 	return 0;
 }
 
+/* special function for ALB rebalance, to replace original nic_investigation.*/
+int 
+ALB_nic_investigation(char *dev_name, struct alb_nic_info *alb_nic) 
+{
+	int sock;
+	struct ifreq ifr; /* this data structure defined in if.h */
+	struct ethtool_cmd edata; /* this defined in ethtool.h */
+	struct ethtool_link_settings ecmd;
+	int rc;
+
+	sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+	if (sock < 0) {
+		fprintf(stderr, "ofproto ioctl_ethtool alb socket err\n");
+		exit(1);
+	}
+
+	/* TODO improve this: devname is unnecessary. */
+	memset(&ctx.ifr, 0, sizeof(ctx.ifr));
+	strcpy(ctx.ifr.ifr_name, dev_name);
+
+	ifr.ifr_data = &edata;
+	edata.cmd = ETHTOOL_GSET;
+	/* get netdev speed info */
+	rc = ioctl(sock, SIOCETHTOOL, &ifr);
+	if (rc < 0) {
+		fprintf(stderr, "ofproto ioctl_ethtool alb socket err\n");
+		exit(1);
+	}
+
+	/* obtain netdevspeed. */
+	switch(ethtool_cmd_speed(&edata)) {
+		case SPEED_10:
+			alb_nic->netdevSpeed = 10;
+			break;
+		case SPEED_100:
+			alb_nic->netdevSpeed = 100;
+			break;
+		case SPEED_1000:
+			alb_nic->netdevSpeed = 1000;
+			break;
+		case SPEED_2500:
+			alb_nic->netdevSpeed = 2500;
+			break;
+		case SPEED_10000:
+			alb_nic->netdevSpeed = 10000;
+			break;
+		case SPEED_40000:
+			alb_nic->netdevSpeed = 40000;
+			break;
+
+		default:
+			alb_nic->netdevSpeed = 0;
+	}
+
+	ifr.ifr_data = &ecmd;
+	ecmd.cmd = ;
+	rc = ioctl();
+	return 0;
+}
+
 /*
 int main(int argc, char const *argv[])
 {

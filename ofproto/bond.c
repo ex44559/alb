@@ -168,6 +168,35 @@ struct bond_pr_rule_op {
     struct rule **pr_rule;
 };
 
+/*------------data structure for ALB balance.---------------------*/
+struct alb_info {
+	/* which data structure to store several bonds? hashmap or linked-list? */
+	struct bond_entry *hash; /* so temporarily use hashmap. */
+
+	/*to be completed. */
+};
+
+struct alb_slave {
+	struct hmap_node hmap_node;
+
+	/* what info is essential? */
+	int txAmount;/* tx info. Should this info belong to hashmap node? */
+	int rxAmount;/* rx info. */
+
+	int weight;/* weighted average metric for a slave. location to be determined. */
+
+	struct bond *slave;/* pointer to bond structure. */
+
+	/* As to taking netdev-speed and other info into consideration,
+	 * here needs descriptions of these info.
+	 */
+
+	int netdevSpeed;/* maybe change to enum-type */
+	int load;/* describe the load of this slave. maybe needs to change data-type. */
+	int delay; 
+};
+/*----------------------------------------------------------------*/
+
 static void bond_entry_reset(struct bond *) OVS_REQ_WRLOCK(rwlock);
 static struct bond_slave *bond_slave_lookup(struct bond *, const void *slave_)
     OVS_REQ_RDLOCK(rwlock);
@@ -1154,6 +1183,7 @@ ALB_rebalance(struct bond *bond)
     struct bond_slave *slave;
 	bool use_recirc;
 	struct nic_load *nic;
+	struct alb_nic_info *alb_nic;
 	struct bond_entry *e;
 	struct ovs_list bals;
 	bool rebalanced = false;
@@ -1178,7 +1208,7 @@ ALB_rebalance(struct bond *bond)
             list_push_back(&e->slave->entries, &e->list_node);
         }
     }
-	
+	/* TODO: investigate slave load and other info. */
     list_init(&bals);
 	nic = malloc(sizeof(struct nic_load));
     HMAP_FOR_EACH (slave, hmap_node, &bond->slaves) {
@@ -1186,7 +1216,12 @@ ALB_rebalance(struct bond *bond)
 			memset(nic, 0, sizeof(struct nic_load));
 			nic_investigation(slave->name, nic);
 			slave->load_bytes = nic->tx_bytes + nic->rx_bytes;
-	
+
+			/*---------ALB gather info-------------*/
+			ALB_nic_investigation(slave->name, alb_nic); /* obtain netdevspeed */
+			/* still need low granularity load info*/
+			/*-------------------------------------*/
+			
             insert_bal_ALB(&bals, slave);
         }
     }
