@@ -102,6 +102,10 @@ struct bond_slave {
     struct ovs_list entries;    /* 'struct bond_entry's assigned here. */
     uint64_t tx_bytes;          /* Sum across 'tx_bytes' of entries. */
 	uint64_t load_bytes;
+
+	/*add ALB relance-related info.*/
+	uint64_t speed;             /* describe netdev speed.*/
+	int64_t score;              /* metric for ALB*/
 };
 
 /* A bond, that is, a set of network devices grouped to improve performance or
@@ -1146,7 +1150,7 @@ insert_bal_ALB(struct ovs_list *bals, struct bond_slave *slave)
     struct bond_slave *pos;
 
     LIST_FOR_EACH (pos, bal_node, bals) {
-        if (slave->load_bytes > pos->load_bytes) {
+        if (slave->score > pos->score) {
             break;
         }
     }
@@ -1215,10 +1219,12 @@ ALB_rebalance(struct bond *bond)
         if (slave->enabled) {
 			memset(nic, 0, sizeof(struct nic_load));
 			nic_investigation(slave->name, nic);
-			slave->load_bytes = nic->tx_bytes + nic->rx_bytes;
+			slave->load_bytes = nic->tx_bytes + nic->rx_bytes; /*need to replace load_bytes to another quota*/
 
 			/*---------ALB gather info-------------*/
 			ALB_nic_investigation(slave->name, alb_nic); /* obtain netdevspeed */
+			slave->speed = alb_nic->netdevSpeed;
+			slave->score = (slave->speed / (slave->load_bytes + 1));
 			/* still need low granularity load info*/
 			/*-------------------------------------*/
 			
@@ -1948,6 +1954,33 @@ get_enabled_slave(struct bond *bond)
 
     return CONTAINER_OF(node, struct bond_slave, list_node);
 }
+//for ALB choose output slave
+static struct bond*
+get_enabled_ALB_slave(struct bond *bond)
+{
+	struct ovs_list *node = NULL;
+	struct bond_slave *slave;
+	int size;
+
+	ovs_mutex_lock(&bond->mutex);
+
+	if (list_is_empty(&bond->enabled_slaves)) {
+		ovs_mutex_unlock(&bond->mutex);
+		return NULL;
+	}
+
+	/*based on multiple source to determine output slave.*/
+	size = list_size(bond->enabled_slaves);
+
+	while (size--) {
+		node = list_pop_front(&bond->enabled_slaves);
+		list_push_back(&bond->enabled_slaves, node);
+
+		slave = CONTAINER_OF(node, struct bond_slave, list_node);
+	}
+
+	ovs_mutex_unlock(&bond->mutex);
+}
 
 //TODO:fix this function to support ALB output.
 
@@ -1985,6 +2018,14 @@ choose_output_slave(const struct bond *bond, const struct flow *flow,
         /* Fall Through. */
 
 	case BM_ALB:
+        if (wc) {
+            flow_mask_hash_fields(flow, wc, NX_HASH_FIELDS_ETH_SRC);
+        }
+        e = lookup_bond_entry(bond, flow, vlan);
+        if (!e->slave || !e->slave->enabled) {
+            e->slave = get_enabled_slave(CONST_CAST(struct bond*, bond));
+        }
+        return e->slave;
 
 		
     case BM_SLB:
