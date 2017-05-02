@@ -76,8 +76,6 @@ struct bond_entry {
      * is used to determine delta (applied to 'tx_bytes' above.) */
     struct rule *pr_rule;
     uint64_t pr_tx_bytes OVS_GUARDED_BY(rwlock);
-
-	uint64_t rx_bytes OVS_GUARDED_BY(rwlock); /* Count of bytes recently received. Added by Sunbo. */
 };
 
 /* A bond slave, that is, one of the links comprising a bond. */
@@ -101,7 +99,6 @@ struct bond_slave {
     struct ovs_list bal_node;   /* In bond_rebalance()'s 'bals' list. */
     struct ovs_list entries;    /* 'struct bond_entry's assigned here. */
     uint64_t tx_bytes;          /* Sum across 'tx_bytes' of entries. */
-	uint64_t load_bytes;
 
 	/*add ALB relance-related info.*/
 	uint64_t speed;             /* describe netdev speed.*/
@@ -155,6 +152,8 @@ struct bond {
     bool lacp_fallback_ab; /* Fallback to active-backup on LACP failure. */
 
     struct ovs_refcount ref_cnt;
+
+	uint64_t timeval_long_threshold; /* threshold for long flow. added by Sunbo. */
 };
 
 /* What to do with an bond_recirc_rule. */
@@ -925,6 +924,10 @@ bond_entry_account(struct bond_entry *entry, uint64_t rule_tx_bytes)
         entry->tx_bytes += delta;
         entry->pr_tx_bytes = rule_tx_bytes;
     }
+
+	if (entry->slave->bond->balance == BM_ALB) {
+		bond_set_entry_type(entry->slave->bond, entry);
+	}
 }
 
 /* Maintain bond stats using post recirculation rule byte counters.*/
@@ -1021,12 +1024,11 @@ void
 bond_account(struct bond *bond, const struct flow *flow, uint16_t vlan,
              uint64_t n_bytes)
 {
-	/*struct bond_entry *alb_entry;*/
-
     ovs_rwlock_wrlock(&rwlock);
     if (bond_is_balanced(bond)) {
         lookup_bond_entry(bond, flow, vlan)->tx_bytes += n_bytes;
     }
+	
     ovs_rwlock_unlock(&rwlock);
 }
 
@@ -1097,6 +1099,63 @@ bond_shift_load(struct bond_entry *hash, struct bond_slave *to)
     /* Arrange for flows to be revalidated. */
     hash->slave = to;
     bond->bond_revalidate = true;
+}
+
+uint64_t
+ALB_update_threshold(struct bond_slave *bond_slave) {
+	struct bond_entry *e;
+	uint64_t sum = 0;
+	uint64_t num = 0;
+
+	LIST_FOR_EACH(e, list_node, &bond_slave->entries) {
+		sum += e->tx_bytes;
+		num++;
+	}
+	
+	return sum / num;
+}
+
+
+/* for ALB, choose an entry to migrate. */
+static struct bond_entry *
+ALB_choose_entry_to_migrate(const struct bond_slave *from, uint64_t to_tx_bytes)
+	OVS_REQ_WRLOCK(rwlock)
+{
+	struct bond_entry *e;
+
+    if (list_is_short(&from->entries)) {
+        /* 'from' carries no more than one MAC hash, so shifting load away from
+         * it would be pointless. */
+        return NULL;
+    }
+
+	/* go through entries list to set entry's type OR do this in bridge run?*/
+	LIST_FOR_EACH(e, list_node, &from->entries) {
+        uint64_t delta = e->tx_bytes;  /* The amount to rebalance.  */
+        uint64_t ideal_tx_bytes = (from->tx_bytes + to_tx_bytes)/2;
+                             /* Note, the ideal traffic is the mid point
+                              * between 'from' and 'to'. This value does
+                              * not change by rebalancing.  */
+        uint64_t new_low;    /* The lower bandwidth between 'to' and 'from'
+                                after rebalancing. */
+
+		uint64_t threshold = ALB_update_threshold(from);
+		
+        new_low = MIN(from->tx_bytes - delta, to_tx_bytes + delta);
+		if ((new_low > to_tx_bytes) && e->tx_bytes < threshold &&
+			 (new_low - to_tx_bytes >= (ideal_tx_bytes - to_tx_bytes) / 10)) {
+			/* Only rebalance if the new 'low' is closer to to the mid point,
+			 * and the improvement exceeds 10% of current traffic
+			 * deviation from the ideal split.
+			 *
+			 * The improvement on the 'high' side is always the same as the
+			 * 'low' side. Thus consider 'low' side is sufficient.	*/
+				return e;
+		} 
+
+	}
+
+    return NULL;
 }
 
 /* Picks and returns a bond_entry to migrate from 'from' (the most heavily
@@ -1185,6 +1244,7 @@ void
 ALB_rebalance(struct bond *bond)
 {
     struct bond_slave *slave;
+	struct bond_entry *entry;
 	bool use_recirc;
 	struct nic_load *nic;
 	struct alb_nic_info *alb_nic;
@@ -1200,7 +1260,6 @@ ALB_rebalance(struct bond *bond)
     if (use_recirc) {
         bond_recirculation_account(bond);
     }
-	
 
     HMAP_FOR_EACH (slave, hmap_node, &bond->slaves) {
         slave->tx_bytes = 0;
@@ -1219,14 +1278,12 @@ ALB_rebalance(struct bond *bond)
         if (slave->enabled) {
 			memset(nic, 0, sizeof(struct nic_load));
 			nic_investigation(slave->name, nic);
-			slave->load_bytes = nic->tx_bytes + nic->rx_bytes; /*need to replace load_bytes to another quota*/
+			slave->load_bytes = nic->tx_bytes; /*need to replace load_bytes to another quota*/
 
 			/*---------ALB gather info-------------*/
 			ALB_nic_investigation(slave->name, alb_nic); /* obtain netdevspeed */
 			slave->speed = alb_nic->netdevSpeed;
 			slave->score = (slave->speed / (slave->load_bytes + 1));
-			/* still need low granularity load info*/
-			/*-------------------------------------*/
 			
             insert_bal_ALB(&bals, slave);
         }
@@ -1249,7 +1306,7 @@ ALB_rebalance(struct bond *bond)
 
         /* 'from' is carrying significantly more load than 'to'.  Pick a hash
          * to move from 'from' to 'to'. */
-        e = choose_entry_to_migrate(from, to->tx_bytes);
+        e = ALB_choose_entry_to_migrate(from, to->tx_bytes);
         if (e) {
             bond_shift_load(e, to);
 
@@ -1970,7 +2027,7 @@ get_enabled_ALB_slave(struct bond *bond)
 	}
 
 	/*based on multiple source to determine output slave.*/
-	size = list_size(bond->enabled_slaves);
+	size = list_size(&bond->enabled_slaves);
 
 	while (size--) {
 		node = list_pop_front(&bond->enabled_slaves);
