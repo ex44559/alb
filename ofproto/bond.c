@@ -225,6 +225,9 @@ static struct bond_slave *choose_output_slave(const struct bond *,
                                               uint16_t vlan)
     OVS_REQ_RDLOCK(rwlock);
 
+uint64_t ALB_update_threshold(const struct bond_slave *slave)
+
+
 /* Attempts to parse 's' as the name of a bond balancing mode.  If successful,
  * stores the mode in '*balance' and returns true.  Otherwise returns false
  * without modifying '*balance'. */
@@ -1269,10 +1272,12 @@ ALB_rebalance(struct bond *bond)
     }
 	/* TODO: investigate slave load and other info. */
     list_init(&bals);
-	nic = malloc(sizeof(struct nic_load));
+	nic = (struct nic_load *)malloc(sizeof(struct nic_load));
+	alb_nic = (struct alb_nic_info *)malloc(sizeof(struct alb_nic_info));
     HMAP_FOR_EACH (slave, hmap_node, &bond->slaves) {
         if (slave->enabled) {
 			memset(nic, 0, sizeof(struct nic_load));
+			memset(alb_nic_info, 0, sizeof(struct alb_nic_info));
 			nic_investigation(slave->name, nic);
 
 			/*---------ALB gather info-------------*/
