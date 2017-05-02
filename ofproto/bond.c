@@ -225,7 +225,7 @@ static struct bond_slave *choose_output_slave(const struct bond *,
                                               uint16_t vlan)
     OVS_REQ_RDLOCK(rwlock);
 
-uint64_t ALB_update_threshold(const struct bond_slave *slave)
+uint64_t ALB_update_threshold(const struct bond_slave *slave);
 
 
 /* Attempts to parse 's' as the name of a bond balancing mode.  If successful,
