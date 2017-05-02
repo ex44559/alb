@@ -1277,7 +1277,7 @@ ALB_rebalance(struct bond *bond)
     HMAP_FOR_EACH (slave, hmap_node, &bond->slaves) {
         if (slave->enabled) {
 			memset(nic, 0, sizeof(struct nic_load));
-			memset(alb_nic_info, 0, sizeof(struct alb_nic_info));
+			memset(alb_nic, 0, sizeof(struct alb_nic_info));
 			nic_investigation(slave->name, nic);
 
 			/*---------ALB gather info-------------*/
