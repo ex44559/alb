@@ -136,7 +136,6 @@ void bond_update_post_recirc_rules(struct bond *, const bool force);
 bool bond_may_recirc(const struct bond *, uint32_t *recirc_id,
                      uint32_t *hash_bias);
 
-uint64_t ALB_update_threshold(const struct bond_slave *bond_slave);
 void ALB_rebalance(struct bond *bond);
 
 #endif /* bond.h */

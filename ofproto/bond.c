@@ -1099,12 +1099,12 @@ bond_shift_load(struct bond_entry *hash, struct bond_slave *to)
 }
 
 uint64_t
-ALB_update_threshold(const struct bond_slave *bond_slave) {
+ALB_update_threshold(const struct bond_slave *slave) {
 	struct bond_entry *e;
 	uint64_t sum = 0;
 	uint64_t num = 0;
 
-	LIST_FOR_EACH(e, list_node, &bond_slave->entries) {
+	LIST_FOR_EACH(e, list_node, &slave->entries) {
 		sum += e->tx_bytes;
 		num++;
 	}
