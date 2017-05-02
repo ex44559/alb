@@ -36,6 +36,13 @@ enum bond_mode {
     BM_ALB   /* Adaptive Load Balance. Added by sunbo*/
 };
 
+/* describe entry characteristic. */
+enum entry_type {
+	LONG, /* long-time, large flow */
+	SHORT, /* short-time, small flow */
+	EMPTY  /* default value, as not defined */
+};
+
 bool bond_mode_from_string(enum bond_mode *, const char *);
 const char *bond_mode_to_string(enum bond_mode);
 
@@ -129,6 +136,7 @@ void bond_update_post_recirc_rules(struct bond *, const bool force);
 bool bond_may_recirc(const struct bond *, uint32_t *recirc_id,
                      uint32_t *hash_bias);
 
+uint64_t ALB_update_threshold(struct bond_slave *bond_slave);
 void ALB_rebalance(struct bond *bond);
 
 #endif /* bond.h */

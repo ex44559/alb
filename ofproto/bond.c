@@ -925,9 +925,6 @@ bond_entry_account(struct bond_entry *entry, uint64_t rule_tx_bytes)
         entry->pr_tx_bytes = rule_tx_bytes;
     }
 
-	if (entry->slave->bond->balance == BM_ALB) {
-		bond_set_entry_type(entry->slave->bond, entry);
-	}
 }
 
 /* Maintain bond stats using post recirculation rule byte counters.*/
@@ -1102,7 +1099,7 @@ bond_shift_load(struct bond_entry *hash, struct bond_slave *to)
 }
 
 uint64_t
-ALB_update_threshold(struct bond_slave *bond_slave) {
+ALB_update_threshold(const struct bond_slave *bond_slave) {
 	struct bond_entry *e;
 	uint64_t sum = 0;
 	uint64_t num = 0;
@@ -1244,7 +1241,6 @@ void
 ALB_rebalance(struct bond *bond)
 {
     struct bond_slave *slave;
-	struct bond_entry *entry;
 	bool use_recirc;
 	struct nic_load *nic;
 	struct alb_nic_info *alb_nic;
@@ -1278,12 +1274,11 @@ ALB_rebalance(struct bond *bond)
         if (slave->enabled) {
 			memset(nic, 0, sizeof(struct nic_load));
 			nic_investigation(slave->name, nic);
-			slave->load_bytes = nic->tx_bytes; /*need to replace load_bytes to another quota*/
 
 			/*---------ALB gather info-------------*/
 			ALB_nic_investigation(slave->name, alb_nic); /* obtain netdevspeed */
 			slave->speed = alb_nic->netdevSpeed;
-			slave->score = (slave->speed / (slave->load_bytes + 1));
+			slave->score = (slave->speed / (slave->tx_bytes + 1));
 			
             insert_bal_ALB(&bals, slave);
         }
@@ -2010,33 +2005,6 @@ get_enabled_slave(struct bond *bond)
     ovs_mutex_unlock(&bond->mutex);
 
     return CONTAINER_OF(node, struct bond_slave, list_node);
-}
-//for ALB choose output slave
-static struct bond*
-get_enabled_ALB_slave(struct bond *bond)
-{
-	struct ovs_list *node = NULL;
-	struct bond_slave *slave;
-	int size;
-
-	ovs_mutex_lock(&bond->mutex);
-
-	if (list_is_empty(&bond->enabled_slaves)) {
-		ovs_mutex_unlock(&bond->mutex);
-		return NULL;
-	}
-
-	/*based on multiple source to determine output slave.*/
-	size = list_size(&bond->enabled_slaves);
-
-	while (size--) {
-		node = list_pop_front(&bond->enabled_slaves);
-		list_push_back(&bond->enabled_slaves, node);
-
-		slave = CONTAINER_OF(node, struct bond_slave, list_node);
-	}
-
-	ovs_mutex_unlock(&bond->mutex);
 }
 
 //TODO:fix this function to support ALB output.
